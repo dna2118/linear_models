@@ -1,8 +1,8 @@
 ---
-title: "Linear_Models"
+title: "Linear Models"
 author: "Dionna Attinson"
 date: "11/7/2019"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -33,6 +33,7 @@ nyc_airbnb =
 fit = lm(price ~ stars + boro, data = nyc_airbnb)
 ```
 
+##This changed our reference to the variable level with least amount of values
 ```{r} 
 nyc_airbnb = 
   nyc_airbnb %>% 
@@ -82,5 +83,88 @@ fit = lm(price ~ stars + boro, data = nyc_airbnb)
 fit %>% 
   broom::tidy()
 ```
+
+## Diagnostics for linear regression models 
+##### Diagnostics for linear regression models is almost always looking at residuals. Sometimes you also want to look at the fitted values.
+
+```{r} 
+modelr::add_residuals(nyc_airbnb, fit) %>% 
+  ggplot(aes(x = boro, y = resid)) + 
+  geom_violin() 
+
+modelr::add_residuals(nyc_airbnb, fit) %>% 
+  ggplot(aes(x = stars, y = resid)) + 
+  geom_point() 
+
+modelr::add_predictions(nyc_airbnb, fit)
+```
+
+## Nesting 
+```{r}
+fit_interaction = lm(price ~ stars * boro + room_type * boro, data = nyc_airbnb) 
+
+fit_interaction %>% 
+  broom::tidy()
+```
+
+```{r}
+nyc_airbnb %>%  
+  filter(boro == "Brooklyn") %>%  
+  lm(price ~ stars + room_type, data = .) %>% 
+  broom::tidy()
+```
+## Let's try to map this
+```{r}
+nyc_airbnb %>% 
+  nest(data = -boro) %>% 
+  mutate(
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x )), 
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(boro, results) %>% 
+  unnest(boro, results)
+```
+
+## Let's nest neighborhoods 
+```{r}
+nyc_airbnb %>% 
+  filter (boro == "Manhattan") %>% 
+  nest(data = -neighborhood) %>% 
+  mutate(
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x )), 
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(neighborhood, results) %>% 
+  unnest(neighborhood, results)
+```
+
+```{r}
+manhattan_nest_lm_results = 
+  nyc_airbnb %>% 
+  filter (boro == "Manhattan") %>% 
+  nest(data=-neighborhood) %>% 
+  mutate(
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x )), 
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(neighborhood, results) %>% 
+  unnest(neighborhood, results)
+```
+
+```{r}
+manhattan_nest_lm_results %>% 
+  filter(str_detect(term, "room_type")) %>% 
+  ggplot(aes(x = neighborhood, y = estimate)) + 
+  geom_point() + 
+  facet_wrap(~term) + 
+  theme(axis.text.x = element_text(angle = 80, hjust = 1))
+```
+
+```{r}
+nyc_airbnb %>% 
+  filter(neighborhood == "NoHo", room_type == "Shared room")
+```
+
+
 
 
